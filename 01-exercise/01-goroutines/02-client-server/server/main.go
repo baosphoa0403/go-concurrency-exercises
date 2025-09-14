@@ -2,13 +2,27 @@ package main
 
 import (
 	"io"
+	"log"
 	"net"
 	"time"
 )
 
 func main() {
 	// TODO: write server program to handle concurrent client connections.
+	ls, err := net.Listen("tcp", "localhost:8000")
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	for {
+		conn, err := ls.Accept()
+		if err != nil {
+			log.Fatal(err)
+			continue
+		}
+
+		go handleConn(conn)
+	}
 }
 
 // handleConn - utility function
