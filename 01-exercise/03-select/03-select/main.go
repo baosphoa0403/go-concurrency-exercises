@@ -18,11 +18,14 @@ func main() {
 
 	// TODO: if there is no value on channel, do not block.
 	for i := 0; i < 2; i++ {
-		m := <-ch
-		fmt.Println(m)
+		select {
+		case m := <-ch:
+			fmt.Println(m)
+		default:
+			// Do some processing..
+			fmt.Println("processing..")
+			time.Sleep(1500 * time.Millisecond)
+		}
 
-		// Do some processing..
-		fmt.Println("processing..")
-		time.Sleep(1500 * time.Millisecond)
 	}
 }
