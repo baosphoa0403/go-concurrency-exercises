@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 )
 
@@ -17,7 +18,8 @@ func main() {
 func processRequest(userid string) {
 	// TODO: send userID information to checkMemberShip through context for
 	// map lookup.
-	ch := checkMemberShip()
+	ctx := context.WithValue(context.Background(), "user-id", userid)
+	ch := checkMemberShip(ctx)
 	status := <-ch
 	fmt.Printf("membership status of userid : %s : %v\n", userid, status)
 }
@@ -26,13 +28,14 @@ func processRequest(userid string) {
 // extracts the user id information from context.
 // spins a goroutine to do map lookup
 // sends the result on the returned channel.
-func checkMemberShip() <-chan bool {
+func checkMemberShip(ctx context.Context) <-chan bool {
 	ch := make(chan bool)
-	go func() {
+	go func(ctx context.Context) {
 		defer close(ch)
 		// do some database lookup
-		status := db[userid]
+		value := ctx.Value("user-id").(string)
+		status := db[value]
 		ch <- status
-	}()
+	}(ctx)
 	return ch
 }

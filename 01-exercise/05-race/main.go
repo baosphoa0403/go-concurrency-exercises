@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -10,13 +11,30 @@ import (
 // fix the issue.
 
 func main() {
+	resetCh := make(chan struct{})
 	start := time.Now()
-	var t *time.Timer
-	t = time.AfterFunc(randomDuration(), func() {
-		fmt.Println(time.Now().Sub(start))
-		t.Reset(randomDuration())
-	})
-	time.Sleep(5 * time.Second)
+	var mu sync.Mutex
+
+	go func() {
+		t := time.NewTimer(randomDuration())
+		for {
+			select {
+			case <-t.C:
+				mu.Lock()
+				fmt.Println("tick at", time.Now())
+				fmt.Println(time.Now().Sub(start))
+				t.Reset(randomDuration())
+				mu.Unlock()
+			case <-resetCh:
+				fmt.Println("stop loop")
+				return
+			}
+		}
+	}()
+
+	<-time.After(5 * time.Second)
+	close(resetCh)
+	fmt.Println("close channel")
 }
 
 func randomDuration() time.Duration {
