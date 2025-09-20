@@ -1,50 +1,72 @@
 // generator() -> square() ->
-//														-> merge -> print
-//             -> square() ->
+//
+//															-> merge -> print
+//	            -> square() ->
 package main
 
 import (
 	"fmt"
+	"runtime"
 	"sync"
+	"time"
 )
 
-func generator(nums ...int) <-chan int {
+func generator(done chan struct{}, nums ...int) <-chan int {
 	out := make(chan int)
 
 	go func() {
 		for _, n := range nums {
-			out <- n
+			select {
+			case val := <-done:
+				fmt.Println("cancel generator: ", val)
+				return
+			case out <- n:
+				fmt.Println("still send generator", n)
+			}
 		}
 		close(out)
 	}()
 	return out
 }
 
-func square(in <-chan int) <-chan int {
+func square(done chan struct{}, in <-chan int) <-chan int {
 	out := make(chan int)
 	go func() {
 		for n := range in {
-			out <- n * n
+			select {
+			case val := <-done:
+				fmt.Println("cancel square: ", val)
+				return
+			case out <- n * n:
+				fmt.Println("still send square", out)
+			}
+
 		}
-		close(out)
+		defer close(out)
 	}()
 	return out
 }
 
-func merge(cs ...<-chan int) <-chan int {
+func merge(done chan struct{}, cs ...<-chan int) <-chan int {
 	out := make(chan int)
 	var wg sync.WaitGroup
 
-	output := func(c <-chan int) {
+	output := func(c <-chan int, i int) {
+		defer wg.Done()
 		for n := range c {
-			out <- n
+			select {
+			case val := <-done:
+				fmt.Println("cancel merge: ", val, "index: ", i)
+				return
+			case out <- n:
+				fmt.Println("still merge: ", n)
+			}
 		}
-		wg.Done()
 	}
 
 	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
+	for i, c := range cs {
+		go output(c, i)
 	}
 
 	go func() {
@@ -55,14 +77,21 @@ func merge(cs ...<-chan int) <-chan int {
 }
 
 func main() {
-	in := generator(2, 3)
+	done := make(chan struct{})
 
-	c1 := square(in)
-	c2 := square(in)
+	c1 := square(done, generator(done, 2, 3))
+	c2 := square(done, generator(done, 3, 5))
 
-	out := merge(c1, c2)
+	out := merge(done, c1, c2)
 
 	// TODO: cancel goroutines after receiving one value.
 
-	fmt.Println(<-out)
+	v := <-out
+	fmt.Println("first value:", v)
+	close(done)
+
+	time.Sleep(200 * time.Millisecond)
+	g := runtime.NumGoroutine()
+	fmt.Printf("number of goroutine active = %d\n", g)
+
 }

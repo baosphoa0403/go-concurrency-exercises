@@ -16,5 +16,5 @@ func main() {
 		name:  "John Doe",
 		email: "johndoe@example.com",
 	}
-	fmt.Println(u)
+	fmt.Println(u.String())
 }
